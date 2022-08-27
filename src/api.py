@@ -29,7 +29,7 @@ class User:
 
 @app.route('/')
 def index():
-    return jsonify({'name': 'alice','email': 'alice@outlook.com'})
+    return "This is an API with following Endpoints: \n- /create_user\n- /encrypt/USER_ID\n/decrypt/USER_ID\n- /sign/USER_ID\n-/verify/USER_ID"
 
 
 @as_json
@@ -69,6 +69,7 @@ def decrypt(user_id):
 @as_json
 @app.route("/sign/<int:user_id>", methods=['POST', 'GET'])
 def sign(user_id):
+    """Signs given data with users master key"""
     hasher = hashes.Hash(chosen_hash)
     hasher.update(bytes.fromhex(request.get_json(force=True)["plaintext"]))
     digest = hasher.finalize()
@@ -80,6 +81,7 @@ def sign(user_id):
 @as_json
 @app.route("/verify/<int:user_id>", methods=['POST', 'GET'])
 def verify(user_id):
+    """Verifies given signature with users master key"""
     pt = bytes.fromhex(request.get_json(force=True)["plaintext"])
     sig = bytes.fromhex(request.get_json(force=True)["signature"])
     pubkey = users[user_id].asym_key.public_key()
