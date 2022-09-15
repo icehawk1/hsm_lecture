@@ -7,6 +7,9 @@ import os
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import rsa, padding
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.asymmetric import dh
+from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 from flask import Flask, jsonify, request
 from flask_json import FlaskJSON, as_json
 
@@ -19,6 +22,8 @@ mypad = padding.PSS(mgf=padding.MGF1(chosen_hash), salt_length=padding.PSS.MAX_L
 
 users = dict()
 
+# After we entered an HSM cluster, we store corresponding info here
+cluster_info = None
 
 class User:
     def __init__(self, uid, sym_key, asym_key):
@@ -88,6 +93,26 @@ def verify(user_id):
     pubkey.verify(sig, pt, mypad, chosen_hash) # verify() raises Exception when sig is invalid
     return dict(result=True)
 
+
+def create_hsm_cluster(peer_ip):
+    """Asks the given HSM to join this HSM in clustering mode"""
+    # Generate some parameters. These can be reused.
+    cluster_info = dict()
+
+    parameters = dh.generate_parameters(generator=2, key_size=1024)
+    private_key = parameters.generate_private_key()
+
+    # We remember Peer pubkey, so we can detect MitM-Attacks later on
+    cluster_info['peer_public_key'] = _request_cluster_public_key(ip)
+    shared_key = private_key.exchange(peer_public_key)
+
+    # Perform key derivation.
+    cluster_info['derived_key'] = HKDF(
+        algorithm=hashes.SHA256(),
+        length=32,
+        salt=None,
+        info=b'handshake data',
+    ).derive(shared_key)
 
 def _create_user():
     global next_key_id
